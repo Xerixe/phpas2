@@ -81,11 +81,13 @@ class Management implements LoggerAwareInterface
      * Encrypts, signs and compresses the message based on the partner profile.
      * Returns the message final message content.
      *
+     * @param MessageInterface $message
      * @param MimePart|string $payload
      *
+     * @param array $headers Additional headers to be added
      * @return MimePart
      */
-    public function buildMessage(MessageInterface $message, $payload)
+    public function buildMessage(MessageInterface $message, $payload, $headers = [])
     {
         $sender = $message->getSender();
         if (!$sender) {
@@ -114,7 +116,7 @@ class Management implements LoggerAwareInterface
             'Date'         => date('r'),
             // 'Recipient-Address' => $receiver->getTargetUrl(),
             'Ediint-Features' => self::EDIINT_FEATURES,
-        ];
+        ] + $headers;
 
         if (!($payload instanceof MimePart)) {
             $payload = MimePart::fromString($payload);
@@ -289,8 +291,10 @@ class Management implements LoggerAwareInterface
             }
 
             // Verify message using raw payload received from partner
-            if (!CryptoHelper::verify($payload, $cert)) {
-                throw new \RuntimeException('Signature Verification Failed');
+            if ($message->getSender()->verifySignature()) {
+                if (!CryptoHelper::verify($payload, $cert)) {
+                    throw new \RuntimeException('Signature Verification Failed');
+                }
             }
 
             $this->getLogger()->debug('Digital signature of inbound AS2 message has been verified successful.');
